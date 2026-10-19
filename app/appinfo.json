@@ -1,0 +1,15 @@
+{
+  "id": "com.hop.app",
+  "version": "1.0.0",
+  "vendor": "Hop",
+  "type": "web",
+  "main": "index.html",
+  "title": "Hop",
+  "icon": "icon-hop.png",
+  "largeIcon": "largeIcon-hop.png",
+  "bgColor": "#0b0d12",
+  "disableBackHistoryAPI": true,
+  "requiredACG": [
+    "application.launcher"
+  ]
+}

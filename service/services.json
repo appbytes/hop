@@ -1,0 +1,7 @@
+{
+  "id": "com.hop.app.service",
+  "description": "Hop: resolves a YouTube channel's current live stream",
+  "services": [
+    { "name": "com.hop.app.service" }
+  ]
+}

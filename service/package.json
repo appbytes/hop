@@ -1,0 +1,6 @@
+{
+  "name": "com.hop.app.service",
+  "version": "1.0.0",
+  "description": "Hop: resolves a YouTube channel's current live stream",
+  "main": "service.js"
+}

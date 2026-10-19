@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #151923;
+    --text: #f3f4f6;
+    --muted: #8b95a7;
+    --focus: #7cc4ff;
+    --live: #ff3b30;
+    --cols: 5;
+    --gap: 1.8vw;
+    --radius: 1.1vw;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Helvetica Neue", "Segoe UI", Arial, sans-serif; overflow: hidden; }
+
+  /* Header */
+  header { display: flex; align-items: baseline; justify-content: space-between;
+    padding: 2.4vw 4vw 1.2vw; }
+  header h1 { margin: 0; font-size: 2.8vw; letter-spacing: -0.03em; }
+  header .hint { color: var(--muted); font-size: 1.4vw; }
+  header .hint b { color: var(--text); font-weight: 600; padding: 0.15em 0.5em; border: 1px solid #2a3140;
+    border-radius: 0.4em; margin: 0 0.15em; }
+
+  /* Grid */
+  main { padding: 0.8vw 4.5vw 4vw; height: calc(100% - 7.5vw); overflow-y: auto; scroll-behavior: smooth; }
+  .grid { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: var(--gap); }
+  .tile { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius); background: var(--panel);
+    overflow: hidden; transition: transform .14s ease, box-shadow .14s ease, background .14s ease; cursor: pointer;
+    outline: 0.25vw solid transparent; outline-offset: -0.25vw; }
+  .tile .cover { position: absolute; left: 50%; top: 40%; width: 5.4vw; height: 5.4vw; transform: translate(-50%, -50%);
+    border-radius: 1vw; object-fit: cover; }
+  .tile .art { position: absolute; left: 50%; top: 40%; width: 5.4vw; height: 5.4vw; transform: translate(-50%, -50%);
+    border-radius: 1vw; display: flex; align-items: center; justify-content: center;
+    font-size: 2vw; font-weight: 800; color: #fff; }
+  .tile .num { position: absolute; top: 0.7vw; left: 1vw; font-weight: 800; font-size: 1.5vw; color: rgba(255,255,255,.55); }
+  .tile .live { position: absolute; top: 1.15vw; right: 1.1vw; width: 0.8vw; height: 0.8vw; border-radius: 50%; background: var(--live);
+    box-shadow: 0 0 0.6vw rgba(255,59,48,.8); font-size: 0; }
+  .tile .live.off { width: auto; height: auto; border-radius: 0.4vw; background: none; box-shadow: none;
+    font-size: 0.95vw; font-weight: 700; color: #6b7280; letter-spacing: .06em; top: 0.9vw; }
+  .tile .name { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0.9vw 0.85vw; font-size: 1.35vw; font-weight: 600; text-align: center;
+    color: #e5e7eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.focused { transform: scale(1.06); background: #1d2330; outline-color: var(--focus);
+    box-shadow: 0 0 0 0.35vw rgba(124,196,255,.22), 0 1.2vw 3vw rgba(0,0,0,.6); z-index: 3; }
+  .tile.focused .num { color: #fff; }
+  .tile.focused .name { color: #fff; }
+
+  /* Number entry overlay */
+  #entry { position: fixed; top: 4vw; right: 4vw; display: none; flex-direction: column; align-items: flex-end;
+    background: rgba(10,12,18,.92); border: 0.15vw solid #2a3140; border-radius: 1vw; padding: 1.2vw 1.6vw; min-width: 18vw;
+    box-shadow: 0 1vw 3vw rgba(0,0,0,.6); z-index: 10; }
+  #entry.show { display: flex; }
+  #entry .digits { font-size: 5vw; font-weight: 800; letter-spacing: 0.08em; line-height: 1; font-variant-numeric: tabular-nums; }
+  #entry .digits .cursor { display: inline-block; width: 0.5em; border-bottom: 0.12em solid var(--focus); margin-left: 0.1em;
+    animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #entry .match { color: var(--muted); font-size: 1.3vw; margin-top: 0.5vw; height: 1.6vw; }
+  #entry .match.ok { color: var(--text); }
+  #entry .match.bad { color: var(--live); }
+  #entry .bar { width: 100%; height: 0.35vw; background: #2a3140; border-radius: 1vw; margin-top: 0.9vw; overflow: hidden; }
+  #entry .bar i { display: block; height: 100%; background: var(--focus); width: 100%; transform-origin: left; }
+  #entry.counting .bar i { animation: drain var(--timeout) linear forwards; }
+  @keyframes drain { to { transform: scaleX(0); } }
+
+  /* Toast */
+  #toast { position: fixed; left: 50%; bottom: 3.5vw; transform: translateX(-50%) translateY(2vw); opacity: 0;
+    background: rgba(10,12,18,.95); border: 0.15vw solid #2a3140; border-radius: 1vw; padding: 1vw 2vw; font-size: 1.5vw;
+    display: flex; align-items: center; gap: 1vw; transition: all .2s ease; z-index: 10; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast .yt { width: 2.2vw; height: 1.55vw; background: #ff0000; border-radius: 0.35vw; position: relative; }
+  #toast .yt::after { content: ""; position: absolute; left: 42%; top: 28%; border-left: 0.6vw solid #fff;
+    border-top: 0.42vw solid transparent; border-bottom: 0.42vw solid transparent; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hop</h1>
+  <div class="hint">Type a <b>number</b> · <b>OK</b> opens in YouTube · <b>Back</b> exits</div>
+</header>
+<main><div class="grid" id="grid"></div></main>
+
+<div id="entry" style="--timeout:1500ms">
+  <div class="digits"><span id="digits"></span><span class="cursor"></span></div>
+  <div class="match" id="match"></div>
+  <div class="bar"><i></i></div>
+</div>
+
+<div id="toast"><span class="yt"></span><span id="toastText"></span></div>
+
+<script src="webOSTVjs-1.2.13/webOSTV.js" charset="utf-8"></script>
+<script src="channels.js"></script>
+<script>
+(function () {
+  var ENTRY_TIMEOUT_MS = 1500;   // how long to wait for a second digit
+  var COLS = 5;
+
+  var channels = (window.CHANNELS || []).slice().sort(function (a, b) { return a.number - b.number; });
+  var byNumber = {};
+  channels.forEach(function (c) { byNumber[c.number] = c; });
+  var maxDigits = String(Math.max.apply(null, channels.map(function (c) { return c.number; }))).length;
+
+  var grid = document.getElementById('grid');
+  var entry = document.getElementById('entry');
+  var digitsEl = document.getElementById('digits');
+  var matchEl = document.getElementById('match');
+  var toast = document.getElementById('toast');
+  var toastText = document.getElementById('toastText');
+
+  // ---- Build tiles ----
+  function initials(name) {
+    return name.split(/\s+/).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
+  }
+  channels.forEach(function (c, i) {
+    var t = document.createElement('div');
+    t.className = 'tile';
+    t.dataset.index = i;
+    if (c.logo) {
+      var img = document.createElement('img'); img.className = 'cover'; img.alt = ''; img.src = c.logo; t.appendChild(img);
+    } else {
+      var art = document.createElement('div'); art.className = 'art'; art.style.background = c.color || '#333'; art.textContent = initials(c.name); t.appendChild(art);
+    }
+    var num = document.createElement('div'); num.className = 'num'; num.textContent = c.number; t.appendChild(num);
+    var dot = document.createElement('div'); dot.className = 'live'; t.appendChild(dot);
+    var name = document.createElement('div'); name.className = 'name'; name.textContent = c.name; t.appendChild(name);
+    t.addEventListener('click', function () { focusTile(i); openChannel(c); });
+    t.addEventListener('mousemove', function () { if (focused !== i) focusTile(i); });
+    grid.appendChild(t);
+  });
+  var tiles = Array.prototype.slice.call(grid.children);
+
+  // ---- Focus handling ----
+  var focused = 0;
+  function focusTile(i) {
+    if (i < 0 || i >= tiles.length) return;
+    tiles[focused].classList.remove('focused');
+    focused = i;
+    tiles[focused].classList.add('focused');
+    tiles[focused].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  focusTile(0);
+
+  function move(dx, dy) {
+    var row = Math.floor(focused / COLS), col = focused % COLS;
+    var next;
+    if (dx) {
+      next = focused + dx;
+      // wrap within the same row
+      if (Math.floor(next / COLS) !== row || next < 0) next = dx > 0 ? row * COLS : Math.min(row * COLS + COLS - 1, tiles.length - 1);
+      if (next >= tiles.length) next = row * COLS;
+    } else {
+      next = focused + dy * COLS;
+      if (next >= tiles.length) next = tiles.length - 1;              // last row shorter: snap to last tile
+      if (next < 0) next = col;                                       // wrap? no: stay in top row
+    }
+    focusTile(next);
+  }
+
+  // ---- Live stream resolution (in-app service) ----
+  var SERVICE = 'luna://com.hop.app.service';
+  var YOUTUBE_APP_ID = 'youtube.leanback.v4';
+  var TTL_MS = 10 * 60 * 1000;          // how long a resolved live ID is trusted
+  var live = {};                        // url -> { videoId, at }
+
+  function callService(method, params, cb) {
+    if (!(window.webOS && webOS.service)) return cb({ errorText: 'not on webOS' });
+    webOS.service.request(SERVICE, {
+      method: method, parameters: params,
+      onSuccess: function (r) { cb(null, r); },
+      onFailure: function (e) { cb(e); }
+    });
+  }
+  function markTile(c, entry) {
+    var badge = tiles[channels.indexOf(c)].querySelector('.live');
+    badge.textContent = entry.videoId ? '' : 'OFF AIR';
+    badge.classList.toggle('off', !entry.videoId);
+  }
+  function resolveChannel(c, cb) {
+    if (c.videoId) { var fixed = { videoId: c.videoId, at: Date.now() }; live[c.url] = fixed; markTile(c, fixed); return cb(null, fixed); }
+    var hit = live[c.url];
+    if (hit && Date.now() - hit.at < TTL_MS) return cb(null, hit);
+    callService('resolve', { url: c.url, prefer: c.prefer || '' }, function (err, r) {
+      if (err) return cb(err);
+      var entry = { videoId: r.videoId || null, at: Date.now() };
+      live[c.url] = entry;
+      markTile(c, entry);
+      cb(null, entry);
+    });
+  }
+  var refreshing = false, lastRefresh = 0;
+  function refreshAll() {
+    if (refreshing || Date.now() - lastRefresh < 60 * 1000) return;
+    var now = Date.now();
+    var list = channels.filter(function (c) {
+      if (c.videoId) { resolveChannel(c, function () {}); return false; }
+      var hit = live[c.url];
+      return !(hit && now - hit.at < TTL_MS);
+    }).map(function (c) { return { url: c.url, prefer: c.prefer || '' }; });
+    if (!list.length) return;
+    refreshing = true;
+    lastRefresh = now;
+    callService('resolveAll', { channels: list }, function (err, r) {
+      refreshing = false;
+      if (err || !r.results) return;
+      channels.forEach(function (c) {
+        var res = r.results[c.url];
+        if (!res || res.error) return;
+        var entry = { videoId: res.videoId || null, at: Date.now() };
+        live[c.url] = entry;
+        markTile(c, entry);
+      });
+    });
+  }
+
+  // ---- Opening a channel ----
+  var launching = false;
+  function openChannel(c) {
+    if (launching) return;            // ignore repeated presses while one launch is in flight
+    launching = true;
+    setTimeout(function () { launching = false; }, 1500);
+
+    var hit = live[c.url];
+    if (hit && hit.videoId && Date.now() - hit.at < TTL_MS) return launchYouTube(c, hit.videoId);
+
+    showToast('Finding ' + c.name + ' live stream\u2026');
+    resolveChannel(c, function (err, entry) {
+      if (err) return showToast('Could not reach YouTube' + (err.errorText ? ': ' + err.errorText : ''));
+      if (!entry.videoId) { showToast(c.name + ' is not live right now'); return launchYouTube(c, null); }
+      launchYouTube(c, entry.videoId);
+    });
+  }
+  function launchYouTube(c, videoId) {
+    showToast('Opening ' + c.name + ' in YouTube');
+    if (!(window.webOS && webOS.service)) {
+      // Desktop browser fallback for testing (never reached on the TV)
+      setTimeout(function () { window.open(videoId ? 'https://www.youtube.com/watch?v=' + videoId : c.url, '_blank'); }, 350);
+      return;
+    }
+    if (videoId) {
+      // The YouTube app's deep-link parameter is the query fragment "v=<id>", not a URL or a bare ID.
+      return launchApp({ contentTarget: 'v=' + videoId });
+    }
+    launchApp({});
+  }
+  function launchApp(params) {
+    webOS.service.request('luna://com.webos.applicationManager', {
+      method: 'launch',
+      parameters: { id: YOUTUBE_APP_ID, params: params },
+      onSuccess: function () {},
+      onFailure: function (err) { showToast('Could not open YouTube: ' + (err.errorText || err.errorCode)); }
+    });
+  }
+  var toastTimer;
+  function showToast(text) {
+    toastText.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
+  }
+
+  // ---- Number entry ----
+  var buffer = '';
+  var entryTimer = null;
+
+  function candidatesFor(prefix) {
+    // channel numbers that start with this prefix and are longer than it
+    return channels.filter(function (c) {
+      var s = String(c.number);
+      return s.length > prefix.length && s.indexOf(prefix) === 0;
+    });
+  }
+
+  function renderEntry() {
+    digitsEl.textContent = buffer;
+    var exact = byNumber[parseInt(buffer, 10)];
+    matchEl.className = 'match ' + (exact ? 'ok' : (candidatesFor(buffer).length ? '' : 'bad'));
+    matchEl.textContent = exact ? exact.name : (candidatesFor(buffer).length ? '…' : 'No channel ' + buffer);
+    if (exact) focusTile(channels.indexOf(exact));
+  }
+
+  function restartEntryTimer() {
+    clearTimeout(entryTimer);
+    entry.classList.remove('counting');
+    void entry.offsetWidth; // restart the CSS drain animation
+    entry.classList.add('counting');
+    entryTimer = setTimeout(commitEntry, ENTRY_TIMEOUT_MS);
+  }
+
+  function onDigit(d) {
+    if (buffer.length >= maxDigits) buffer = '';
+    buffer += d;
+    entry.classList.add('show');
+    renderEntry();
+
+    var exact = byNumber[parseInt(buffer, 10)];
+    var longer = candidatesFor(buffer);
+
+    if (buffer.length >= maxDigits || (exact && longer.length === 0)) {
+      // nothing longer can follow: open right away
+      clearTimeout(entryTimer);
+      entry.classList.remove('counting');
+      entryTimer = setTimeout(commitEntry, 250);   // brief pause so the user sees the digits
+    } else if (!exact && longer.length === 0) {
+      // e.g. "9" when no 9 and no 9x exist: show error, then clear
+      clearTimeout(entryTimer);
+      entry.classList.remove('counting');
+      entryTimer = setTimeout(clearEntry, 1200);
+    } else {
+      // ambiguous (e.g. "1" with 10..19 present): wait for another digit
+      restartEntryTimer();
+    }
+  }
+
+  function commitEntry() {
+    var c = byNumber[parseInt(buffer, 10)];
+    if (c) { openChannel(c); clearEntry(); }
+    else { matchEl.className = 'match bad'; matchEl.textContent = 'No channel ' + buffer; entryTimer = setTimeout(clearEntry, 1200); }
+  }
+  function clearEntry() {
+    clearTimeout(entryTimer);
+    buffer = '';
+    entry.classList.remove('show', 'counting');
+  }
+
+  // ---- Relaunch (app already running and opened again) ----
+  document.addEventListener('webOSRelaunch', function () { clearEntry(); refreshAll(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { clearEntry(); refreshAll(); } });
+  refreshAll();
+  setInterval(function () { if (!document.hidden) refreshAll(); }, TTL_MS);
+
+  // ---- Keys ----
+  // LG remote keyCodes: arrows 37-40, OK 13, Back 461, digits 48-57, CH up 427, CH down 428
+  document.addEventListener('keydown', function (e) {
+    if (e.repeat) return;              // a held key (e.g. Quick Access long-press) must not type digits
+    var k = e.keyCode;
+    if (k >= 48 && k <= 57) { onDigit(String(k - 48)); e.preventDefault(); return; }
+    if (k >= 96 && k <= 105) { onDigit(String(k - 96)); e.preventDefault(); return; }  // numpad on a PC
+    switch (k) {
+      case 37: move(-1, 0); break;
+      case 39: move(1, 0); break;
+      case 38: move(0, -1); break;
+      case 40: move(0, 1); break;
+      case 13: if (buffer) { clearTimeout(entryTimer); commitEntry(); } else openChannel(channels[focused]); break;
+      case 427: case 33: focusTile(Math.max(0, focused - 1)); openChannel(channels[focused]); break;   // CH up / PageUp
+      case 428: case 34: focusTile(Math.min(tiles.length - 1, focused + 1)); openChannel(channels[focused]); break; // CH down / PageDown
+      case 461: case 27: case 8:
+        if (buffer) { clearEntry(); }               // Back cancels number entry first
+        else if (window.webOS && webOS.platformBack) { webOS.platformBack(); }
+        break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+})();
+</script>
+</body>
+</html>

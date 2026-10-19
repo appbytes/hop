@@ -1,0 +1,10 @@
+# local device settings (TV address, pairing passphrase): never commit
+.env
+
+# build output
+build/
+*.ipk
+
+# tooling
+node_modules/
+.DS_Store
